@@ -59,24 +59,47 @@
 
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Loads the starter listing data, applies the optional size
+  and inclusive maximum-price filters, scores the remaining listings by
+  case-insensitive keyword overlap with the requested description, and puts
+  the best matches first. Size matching uses whole size tokens: for example,
+  `M` matches `S/M`, but `L` does not match `XL` and `S` does not match `US 9`.
+- **Inputs:** `description` (`str`) — required search words; `size`
+  (`str | None`, default `None`) — an optional size filter; `max_price`
+  (`float | None`, default `None`) — an optional inclusive price ceiling.
+- **Returns:** `list[dict]` containing up to `config.SEARCH_RESULT_LIMIT` full
+  listing dictionaries, ordered from highest to lowest keyword-overlap score.
+  Each dictionary retains the starter fields `id`, `title`, `description`,
+  `category`, `style_tags`, `size`, `condition`, `price`, `colors`, `brand`,
+  and `platform`.
+- **When it has nothing:** Returns `[]`, never `None` and never an exception.
 
 ### `suggest_outfit`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Uses the starter model adapter to suggest one or two ways
+  to style the selected listing, naming compatible pieces from the user's
+  wardrobe when those pieces are available.
+- **Inputs:** `new_item` (`dict`) — the selected full listing dictionary;
+  `wardrobe` (`dict`) — a dictionary whose `items` key contains a
+  `list[dict]` of wardrobe items.
+- **Returns:** A non-empty `str` containing one or two outfit suggestions.
+- **When it has nothing:** When `wardrobe["items"]` is empty, returns a
+  non-empty string with useful general styling advice for `new_item` instead
+  of raising an exception or returning an empty string.
 
 ### `create_fit_card`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Uses the starter model adapter to turn an outfit suggestion
+  and its selected listing into a short caption someone could realistically
+  post.
+- **Inputs:** `outfit` (`str`) — the result from `suggest_outfit`; `new_item`
+  (`dict`) — the selected full listing dictionary.
+- **Returns:** A `str` containing a two-to-four-sentence caption that mentions
+  the item, its price, and its platform once each and describes a specific
+  vibe.
+- **When it has nothing:** If `outfit` is empty or whitespace, returns a
+  non-empty descriptive message explaining that no outfit suggestion was
+  available, rather than raising an exception or returning an empty string.
 
 ---
 
@@ -93,13 +116,20 @@
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:**
+**Branch rule:** If `search_listings` returns `[]`, put a useful message in
+`session["error"]` that names something the user can change in the search, and
+stop immediately. Otherwise, store the results, select the first listing, and
+continue to `suggest_outfit`.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Deterministic string parsing in
+`agent.py::run_agent`: extract an `under $...` price and an explicit size when
+present, then use the remaining item words as the description.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** `parsed` → `search_results` →
+`selected_item` → `outfit_suggestion` → `fit_card`. Each tool reads the value
+stored by the previous step back from the session before it is called.
 
 ---
 
