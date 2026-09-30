@@ -39,25 +39,18 @@
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
-
-
+FitFindr lets a user describe a secondhand clothing item they want, optionally
+including a size and maximum price. It searches the available starter listings
+and selects the first result from the ranked matches. Using that listing and
+the user's wardrobe information, it suggests one or two outfits; if the
+wardrobe is empty, it gives general styling advice instead. Finally, it creates
+a short fit-card caption based on the selected listing and outfit suggestion.
 
 ---
 
 ## Tool Inventory
 
-<!-- Four lines per tool. This is worth 2 points and it's the single most
-     common place students lose them.
-
-     "Returns a list" earns NOTHING. The description has to say what is IN
-     the list.
-
-     The empty case isn't optional either — it's the thing your loop branches
-     on, and if you don't decide it here you'll discover it as a crash in
-     Milestone 5. -->
-
-### `search_listings`
+### `search_listings(description, size, max_price)`
 
 - **What it does:** Loads the starter listing data, applies the optional size
   and inclusive maximum-price filters, scores the remaining listings by
@@ -72,9 +65,10 @@
   Each dictionary retains the starter fields `id`, `title`, `description`,
   `category`, `style_tags`, `size`, `condition`, `price`, `colors`, `brand`,
   and `platform`.
-- **When it has nothing:** Returns `[]`, never `None` and never an exception.
+- **When it has nothing:** If no listing passes the filters and shares a
+  description keyword, returns `[]`, not `None`.
 
-### `suggest_outfit`
+### `suggest_outfit(new_item, wardrobe)`
 
 - **What it does:** Uses the starter model adapter to suggest one or two ways
   to style the selected listing, naming compatible pieces from the user's
@@ -87,7 +81,7 @@
   non-empty string with useful general styling advice for `new_item` instead
   of raising an exception or returning an empty string.
 
-### `create_fit_card`
+### `create_fit_card(outfit, new_item)`
 
 - **What it does:** Uses the starter model adapter to turn an outfit suggestion
   and its selected listing into a short caption someone could realistically
@@ -105,21 +99,11 @@
 
 ## Planning Loop
 
-<!-- Your branch rule, stated as a rule — the condition AND both paths — plus
-     the file and function that holds it.
-
-     Like this:
-       "If search_listings returns an empty list, put a message in the session
-        and stop. Otherwise take the first result and go to suggest_outfit."
-        — agent.py::run_agent
-
-     The grader checks your code against what you claim here, so the file and
-     function have to be real. -->
-
 **Branch rule:** If `search_listings` returns `[]`, put a useful message in
 `session["error"]` that names something the user can change in the search, and
-stop immediately. Otherwise, store the results, select the first listing, and
-continue to `suggest_outfit`.
+stop immediately before either model-backed tool is called. Otherwise, store
+the results, select the first listing, store it in `session["selected_item"]`,
+and continue through `suggest_outfit` and `create_fit_card`.
 
 **Where it lives:** `agent.py::run_agent`
 
@@ -129,63 +113,109 @@ present, then use the remaining item words as the description.
 
 **What moves through the session:** `parsed` → `search_results` →
 `selected_item` → `outfit_suggestion` → `fit_card`. Each tool reads the value
-stored by the previous step back from the session before it is called.
+stored by the previous step back from the session before it is called; the
+selected item is also read from the session again for `create_fit_card`.
 
 ---
 
 ## Sample Run
 
-<!-- Two things go here.
-
-     1. One FULL query and its output, pasted as text.
-     2. Your three per-tool terminal tests — the command and what it printed. -->
-
 **One full query**
 
-```
-$ python app.py ask '...'
+```text
+PS> python app.py ask 'vintage graphic tee under $30'
 
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   **Outfit 1: Y2K Streetwear**
+*   **Top:** Y2K Baby Tee — Butterfly Print
+*   **Bottoms:** Baggy straight-leg jeans (dark wash)
+*   **Outerwear:** Vintage black denim jacket
+*   **Shoes:** Chunky white sneakers
+*   **Accessories:** Black crossbody bag
+
+**Why it works:** The fitted, cropped silhouette of the baby tee balances the volume of the high-waisted baggy jeans, hitting the exact Y2K proportion. Layering the slightly cropped black denim jacket keeps the waistline defined, while the chunky sneakers tie the retro streetwear aesthetic together.
+
+***
+
+**Outfit 2: Casual Contrast**
+*   **Top:** Y2K Baby Tee — Butterfly Print
+*   **Bottoms:** Wide-leg khaki trousers
+*   **Accessories:** Brown leather belt, Black crossbody bag, Black combat boots
+
+**Why it works:** Pairing the ultra-feminine, pink-and-purple butterfly tee with utilitarian khaki trousers creates an intentional high-low mix. Tucking the tee in and adding the brown leather belt pulls the earth tones of the trousers together with the warm tones in the graphic.
+
+  Fit card: Channeling peak 2000s energy with this butterfly print Y2K baby tee, listed on Depop for just $18. I love wearing it tucked into wide-leg khaki trousers with chunky combat boots for that effortless high-low contrast. It gives total vintage mall-rat chic.
+
+2 model calls this session, 871 prompt + 308 output tokens
 ```
 
 **The three tools, tested one at a time**
 
-```
-$ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
-
-```
-
-```
-$ python -c "from tools import suggest_outfit; ..."
-
+```text
+PS> python -c "from tools import search_listings; print([(item['title'], item['size'], item['price']) for item in search_listings('graphic tee', size='L', max_price=30)])"
+[('Graphic Tee — 2003 Tour Bootleg Style', 'L', 24.0), ('Vintage Band Tee — Faded Grey', 'L', 19.0), ('Vintage Graphic Hoodie — Faded Black', 'L', 26.0)]
 ```
 
-```
-$ python -c "from tools import create_fit_card; ..."
+```text
+PS> python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+**Outfit 1: Casual Streetwear**
+*   **Tops:** White ribbed tank top
+*   **Bottoms:** Vintage Levi's 501 Jeans (Medium wash)
+*   **Outerwear:** Vintage black denim jacket
+*   **Shoes:** Chunky white sneakers
+*   **Accessories:** Black crossbody bag
 
+**Why it works:** The white ribbed tank tucked into the medium wash 501s creates a clean, classic base. Adding the cropped black denim jacket introduces a cool black-and-blue contrast, while the chunky white sneakers and black crossbody tie the streetwear aesthetic together.
+
+***
+
+**Outfit 2: Relaxed Layers**
+*   **Tops:** Oversized grey crewneck sweatshirt
+*   **Bottoms:** Vintage Levi's 501 Jeans (Medium wash)
+*   **Shoes:** Black combat boots
+*   **Accessories:** Brown leather belt, Black crossbody bag
+
+**Why it works:** The grey crewneck's hip-length drop contrasts nicely with the straight-leg fit of the 501s. Tucking the hem slightly at the front allows the brown leather belt to peek through, grounding the look before finishing with rugged black combat boots.
+```
+
+```text
+PS> python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('Pair it with a white ribbed tank and chunky white sneakers.', load_listings()[0]))"
+Nothing beats the feel of truly broken-in denim, and these Vintage Levi's 501 Jeans deliver all the right vintage vibes. I'm styling this W30 L30 pair with a crisp white ribbed tank for an effortless, everyday look. Grab them on Depop for just $38.00 before I change my mind!
 ```
 
 ---
 
 ## How I Used AI
 
-<!-- Two specific moments. What you asked, what came back, what you changed.
+### AI use example 1 — Acceptance criteria
 
-     "I used Claude to help me code" is not enough.
+- **What I asked:** I asked Codex to inspect the starter criteria and explain
+  what my three additional criteria needed to measure without writing them for
+  me.
+- **What the AI returned:** It identified three observable areas: whether the
+  selected listing survives the session-state handoff, whether the fit card
+  preserves useful item and styling details, and whether an empty wardrobe is
+  handled without an error.
+- **What I changed or decided:** I selected and supplied Criteria 3–5 around
+  those areas, then adjusted the wording so each has a measurable target: 5 of
+  5 for deterministic state transfer and empty-wardrobe handling, and at least
+  4 of 5 for model-generated fit-card quality.
 
-     "I gave Claude my search_listings spec. It returned None on no match
-     instead of an empty list, so I changed it" is the level we want. -->
+### AI use example 2 — Planning loop
 
-**Moment 1**
-
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
-
-**Moment 2**
-
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- **What I asked:** I asked Codex to finish Milestone 5 using the starter's
+  existing session dictionary, with a real empty-search branch and values read
+  back from session before each later tool call.
+- **What the AI returned:** Codex found that `run_agent()` was still the starter
+  stub: it created a session, stored a "planning loop isn't built yet" error,
+  and returned without calling any tool.
+- **What I changed or decided:** I implemented deterministic regular-expression
+  parsing for description, size, and maximum price, then added a three-step
+  planning loop in `agent.py`. Search results, the selected listing, the outfit
+  suggestion, and the final fit card now move through session state; an empty
+  search stores actionable advice and returns before either model-backed tool
+  runs.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 

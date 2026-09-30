@@ -13,6 +13,8 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
+import re
+
 import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
@@ -64,37 +66,10 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         the run ended early and the later fields will still be None.
 
     ─────────────────────────────────────────────────────────────────────────
-    TODO — build this, following the branch rule you wrote in Milestone 2.
-
-      1. Start a session with new_session().
-
-      2. Count the times round the loop, and call trace.check_iterations(count)
-         on each one before you go again. It raises when the count passes
-         MAX_ITERATIONS in config.py — see trace.py.
-
-      3. Parse the query into a description, a size, and a max_price. Regex,
-         string splitting, or asking the model are all fine — say which you
-         chose in your README. Put the result in session["parsed"].
-
-      4. Call search_listings() with what you parsed.
-         Put the results in session["search_results"].
-
-         ⚠️ THIS IS THE BRANCH. If nothing came back:
-              - put a message in session["error"] saying what the user could
-                change — "No results" is not that message
-              - return the session
-              - do NOT call suggest_outfit with nothing
-
-      5. Choose an item — the first result is fine. Put it in
-         session["selected_item"].
-
-      6. Call suggest_outfit() with the selected item and the wardrobe.
-         Put the result in session["outfit_suggestion"].
-
-      7. Call create_fit_card() with the outfit and the item.
-         Put the result in session["fit_card"].
-
-      8. Return the session.
+    The query is parsed with regular expressions, then the loop advances
+    through search, outfit suggestion, and fit-card creation. Each tool result
+    is written to the session before the next step reads it back. An empty
+    search result returns early, leaving the later session fields as None.
 
     ─────────────────────────────────────────────────────────────────────────
     IN UNIT 4 you come back and add two things:
@@ -107,8 +82,69 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     """
     session = new_session(query, wardrobe)
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
+    price_pattern = r"\bunder\s+\$?\s*(\d+(?:\.\d{1,2})?)\b"
+    size_pattern = (
+        r"\b(?:in\s+)?size\s+"
+        r"((?:US\s+)?\d+(?:\.\d+)?|[A-Z]+\d*(?:/[A-Z]+\d*)?)\b"
+    )
+
+    price_match = re.search(price_pattern, query, flags=re.IGNORECASE)
+    max_price = float(price_match.group(1)) if price_match else None
+    without_price = re.sub(price_pattern, "", query, flags=re.IGNORECASE)
+
+    size_match = re.search(size_pattern, without_price, flags=re.IGNORECASE)
+    size = size_match.group(1) if size_match else None
+    description = re.sub(size_pattern, "", without_price, flags=re.IGNORECASE)
+    description = re.sub(r"\s+", " ", description).strip(" ,")
+
+    session["parsed"] = {
+        "description": description,
+        "size": size,
+        "max_price": max_price,
+    }
+
+    next_step = "search_listings"
+    iteration = 0
+
+    while next_step:
+        iteration += 1
+        trace.check_iterations(iteration)
+
+        if next_step == "search_listings":
+            session["search_results"] = search_listings(
+                description=session["parsed"]["description"],
+                size=session["parsed"]["size"],
+                max_price=session["parsed"]["max_price"],
+            )
+
+            if not session["search_results"]:
+                changes = ["using different description words"]
+                if session["parsed"]["size"] is not None:
+                    changes.append("changing or removing the size")
+                if session["parsed"]["max_price"] is not None:
+                    changes.append("raising the maximum price")
+                session["error"] = (
+                    "No listings matched. Try " + " or ".join(changes) + "."
+                )
+                return session
+
+            session["selected_item"] = session["search_results"][0]
+            next_step = "suggest_outfit"
+
+        elif next_step == "suggest_outfit":
+            session["outfit_suggestion"] = suggest_outfit(
+                session["selected_item"],
+                session["wardrobe"],
+            )
+            next_step = "create_fit_card"
+
+        elif next_step == "create_fit_card":
+            session["fit_card"] = create_fit_card(
+                session["outfit_suggestion"],
+                session["selected_item"],
+            )
+            next_step = None
+
     return session
 
 
