@@ -190,7 +190,7 @@ Nothing beats the feel of truly broken-in denim, and these Vintage Levi's 501 Je
 
 ### AI use example 1 — Acceptance criteria
 
-- **What I asked:** I asked Codex to inspect the starter criteria and explain
+- **What I asked:** I asked Claude to inspect the starter criteria and explain
   what my three additional criteria needed to measure without writing them for
   me.
 - **What the AI returned:** It identified three observable areas: whether the
@@ -204,10 +204,10 @@ Nothing beats the feel of truly broken-in denim, and these Vintage Levi's 501 Je
 
 ### AI use example 2 — Planning loop
 
-- **What I asked:** I asked Codex to finish Milestone 5 using the starter's
+- **What I asked:** I asked Claude to finish Milestone 5 using the starter's
   existing session dictionary, with a real empty-search branch and values read
   back from session before each later tool call.
-- **What the AI returned:** Codex found that `run_agent()` was still the starter
+- **What the AI returned:** Claude found that `run_agent()` was still the starter
   stub: it created a session, stored a "planning loop isn't built yet" error,
   and returned without calling any tool.
 - **What I changed or decided:** I implemented deterministic regular-expression
