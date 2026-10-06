@@ -107,6 +107,12 @@ and continue through `suggest_outfit` and `create_fit_card`.
 
 **Where it lives:** `agent.py::run_agent`
 
+**MCP routing:** The search step calls
+`mcp_client.call_tool("search_listings", arguments)`. The registered tool in
+`mcp_server.py` delegates to the existing `tools.py::search_listings`
+implementation, and `mcp_client.py` unwraps the response back into the same
+`list[dict]` shape before it enters session state.
+
 **How the query is parsed:** Deterministic string parsing in
 `agent.py::run_agent`: extract an `under $...` price and an explicit size when
 present, then use the remaining item words as the description.
