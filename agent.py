@@ -72,14 +72,9 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     is written to the session before the next step reads it back. An empty
     search result returns early, leaving the later session fields as None.
 
-    ─────────────────────────────────────────────────────────────────────────
-    IN UNIT 4 you come back and add two things:
-
-      • Trace calls. One per step. `trace.step("search_listings", inputs=...,
-        returned=...)` — see trace.py. Your README needs the output.
-
-      • A handler for ModelUnavailable, so a bad key produces a message rather
-        than a stack trace. The import is already at the top of this file.
+    Each logical tool boundary records its inputs and result through trace.py.
+    ModelUnavailable is handled separately from programming errors so a model
+    access problem ends with useful next steps instead of an exception label.
     """
     session = new_session(query, wardrobe)
 
@@ -112,13 +107,28 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         trace.check_iterations(iteration)
 
         if next_step == "search_listings":
+            search_inputs = {
+                "description": session["parsed"]["description"],
+                "size": session["parsed"]["size"],
+                "max_price": session["parsed"]["max_price"],
+            }
             session["search_results"] = mcp_client.call_tool(
                 "search_listings",
-                {
-                    "description": session["parsed"]["description"],
-                    "size": session["parsed"]["size"],
-                    "max_price": session["parsed"]["max_price"],
-                },
+                search_inputs,
+            )
+            trace.step(
+                "search_listings (via MCP)",
+                inputs=(
+                    f"description={search_inputs['description']!r}, "
+                    f"size={search_inputs['size']!r}, "
+                    f"max_price={search_inputs['max_price']!r}"
+                ),
+                returned=session["search_results"],
+                note=(
+                    "branch: results found, continuing"
+                    if session["search_results"]
+                    else "branch: empty, stopping"
+                ),
             )
 
             if not session["search_results"]:
@@ -136,16 +146,63 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             next_step = "suggest_outfit"
 
         elif next_step == "suggest_outfit":
-            session["outfit_suggestion"] = suggest_outfit(
-                session["selected_item"],
-                session["wardrobe"],
+            outfit_inputs = (
+                f"new_item={session['selected_item']['title']!r} "
+                f"(id={session['selected_item']['id']}), "
+                f"wardrobe_items={len(session['wardrobe'].get('items', []))}"
+            )
+            try:
+                session["outfit_suggestion"] = suggest_outfit(
+                    session["selected_item"],
+                    session["wardrobe"],
+                )
+            except ModelUnavailable:
+                session["error"] = (
+                    "The styling model could not be reached, so I couldn't "
+                    "finish this request. Try again later, or check the "
+                    "configured model credentials."
+                )
+                trace.step(
+                    "suggest_outfit",
+                    inputs=outfit_inputs,
+                    returned=session["error"],
+                    note="model unavailable, stopping",
+                )
+                return session
+            trace.step(
+                "suggest_outfit",
+                inputs=outfit_inputs,
+                returned=session["outfit_suggestion"],
             )
             next_step = "create_fit_card"
 
         elif next_step == "create_fit_card":
-            session["fit_card"] = create_fit_card(
-                session["outfit_suggestion"],
-                session["selected_item"],
+            fit_card_inputs = (
+                f"new_item={session['selected_item']['title']!r}; "
+                f"outfit={session['outfit_suggestion']!r}"
+            )
+            try:
+                session["fit_card"] = create_fit_card(
+                    session["outfit_suggestion"],
+                    session["selected_item"],
+                )
+            except ModelUnavailable:
+                session["error"] = (
+                    "The styling model could not be reached, so I couldn't "
+                    "finish this request. Try again later, or check the "
+                    "configured model credentials."
+                )
+                trace.step(
+                    "create_fit_card",
+                    inputs=fit_card_inputs,
+                    returned=session["error"],
+                    note="model unavailable, stopping",
+                )
+                return session
+            trace.step(
+                "create_fit_card",
+                inputs=fit_card_inputs,
+                returned=session["fit_card"],
             )
             next_step = None
 

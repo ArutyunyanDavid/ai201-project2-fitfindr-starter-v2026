@@ -243,17 +243,118 @@ Nothing beats the feel of truly broken-in denim, and these Vintage Levi's 501 Je
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes all three tools | At least 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Selected item stays the same across session state | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card includes the selected item and a styling detail | At least 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Empty wardrobe returns general styling advice without an error | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+The complete unedited output for all 25 tries is in
+`results/run_2026-10-06_1145_before.md`. The evidence below is copied from
+Try 1 of each scenario.
 
+### Criterion 1 evidence
+
+Source: `agent.py` — `run_agent()`; captured by `run_eval.py` — `run_once()`
+
+```text
+- stopped early: no
+- selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+- search_results: 10
+
+Fit card:
+
+Channeling major 2000s pop-star energy in this Y2K butterfly baby tee, scored on Depop for just $18. I love balancing the cropped fit by pairing it with baggy dark-wash jeans and chunky white sneakers. It's giving ultimate nostalgic streetwear vibes. ✨🦋
+
+Trace:
+
+[1] search_listings (via MCP)
+      in:  description='vintage graphic tee', size=None, max_price=30.0
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+      →    branch: results found, continuing
+[2] suggest_outfit
+      in:  new_item='Y2K Baby Tee — Butterfly Print' (id=lst_002), wardrobe_items=10
+      out: **Outfit 1: Y2K Streetwear** *   **Top:** Y2K Butterfly Baby Tee *   **Bottoms:** Baggy straight-leg jeans (da…
+[3] create_fit_card
+      in:  new_item='Y2K Baby Tee — Butterfly Print'; outfit='**Outfit 1: Y2K Streetwear**\n*   **Top:** Y2K Butterfly Ba…
+      out: Channeling major 2000s pop-star energy in this Y2K butterfly baby tee, scored on Depop for just $18. I love ba…
 ```
 
+### Criterion 2 evidence
+
+Source: `agent.py` — `run_agent()`; captured by `run_eval.py` — `run_once()`
+
+```text
+- stopped early: yes — No listings matched. Try using different description words or changing or removing the size or raising the maximum price.
+- selected_item: (none)
+- search_results: 0
+
+Trace:
+
+[1] search_listings (via MCP)
+      in:  description='designer ballgown', size='XXS', max_price=5.0
+      out: [] (empty)
+      →    branch: empty, stopping
+```
+
+### Criterion 3 evidence
+
+Source: `agent.py` — `run_agent()`; captured by `run_eval.py` — `run_once()`
+
+```text
+- stopped early: no
+- selected_item: 90s Track Jacket — Navy/White Stripe ($45.0, poshmark)
+- search_results: 7
+
+[2] suggest_outfit
+      in:  new_item='90s Track Jacket — Navy/White Stripe' (id=lst_004), wardrobe_items=10
+      out: **Outfit 1: Casual Streetwear** *   **Top:** White ribbed tank top *   **Bottoms:** Baggy straight-leg jeans (…
+```
+
+### Criterion 4 evidence
+
+Source: `tools.py` — `create_fit_card()` via `agent.py` — `run_agent()`;
+captured by `run_eval.py` — `run_once()`
+
+```text
+- selected_item: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
+
+Outfit suggestion:
+
+**Outfit 1: High-Contrast Denim (Double Denim)**
+*   **Top:** White ribbed tank top
+*   **Bottoms:** Baggy straight-leg jeans (dark wash)
+*   **Outerwear:** Light wash cropped denim jacket
+*   **Shoes:** Chunky white sneakers
+*   **Accessories:** Black crossbody bag
+
+Fit card:
+
+Found this dreamy light wash cropped denim jacket on Poshmark for just $42. I love the structured shoulders, so I’m styling it with baggy dark-wash jeans and a white tank for the ultimate effortless streetwear look. It's the ultimate blank canvas for my wardrobe.
+```
+
+### Criterion 5 evidence
+
+Source: `tools.py` — `suggest_outfit()` via `agent.py` — `run_agent()`;
+captured by `run_eval.py` — `run_once()`
+
+```text
+- stopped early: no
+- selected_item: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
+- search_results: 7
+
+Outfit suggestion:
+
+Buy it. At $42, a cropped light-wash denim jacket with good structure is a versatile layering staple.
+
+**Two ways to style it using common basics:**
+
+1. **Casual Contrast:** Layer it over a plain white crewneck t-shirt paired with black straight-leg trousers and white leather sneakers. The light blue wash pops against dark pants, and the crop balances the relaxed trousers.
+2. **Monochromatic Denim:** Pair it with black skinny jeans and a fitted black tank top, finished off with black ankle boots. The jacket serves as a bright, structured focal point over a sleek base.
+
+[2] suggest_outfit
+      in:  new_item='Denim Jacket — Light Wash, Cropped' (id=lst_007), wardrobe_items=0
+      out: Buy it. At $42, a cropped light-wash denim jacket with good structure is a versatile layering staple.   **Two …
 ```
 
 ---
@@ -304,14 +405,26 @@ that produced it:
 
 **Happy path**
 
-```
-
+```text
+[1] search_listings (via MCP)
+      in:  description='vintage graphic tee', size=None, max_price=30.0
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+      →    branch: results found, continuing
+[2] suggest_outfit
+      in:  new_item='Y2K Baby Tee — Butterfly Print' (id=lst_002), wardrobe_items=10
+      out: **Outfit 1: Y2K Streetwear** *   **Top:** Y2K Baby Tee — Butterfly Print *   **Bottoms:** Baggy straight-leg j…
+[3] create_fit_card
+      in:  new_item='Y2K Baby Tee — Butterfly Print'; outfit='**Outfit 1: Y2K Streetwear**\n*   **Top:** Y2K Baby Tee — B…
+      out: Channeling peak 2000s energy with this butterfly print Y2K baby tee, listed on Depop for just $18. I love wear…
 ```
 
 **Empty search**
 
-```
-
+```text
+[1] search_listings (via MCP)
+      in:  description='diamond-encrusted astronaut tuxedo', size=None, max_price=2.0
+      out: [] (empty)
+      →    branch: empty, stopping
 ```
 
 **On the MCP move:** <!-- what changed in your code, and whether anything
@@ -319,6 +432,41 @@ behaved differently afterwards. If the rewire didn't work, say exactly where it
 broke — the error text and the last thing that worked. That earns the point in
 full. -->
 
+`agent.py::run_agent` calls `mcp_client.call_tool("search_listings", ...)`;
+`mcp_server.py` registers that one tool and delegates to
+`tools.py::search_listings`. The MCP client normalizes the response back to the
+same `list[dict]` used by session state, so the logical search result and later
+planning-loop behavior remained the same after the rewire.
+
+### Failure-mode checks
+
+These messages came from real command-line runs during Milestone 2.
+
+**Empty search** — command:
+`python app.py ask 'diamond-encrusted astronaut tuxedo under $2'`
+
+```text
+No listings matched. Try using different description words or raising the maximum price.
+```
+
+**Empty wardrobe** — command:
+`python app.py ask 'vintage graphic tee under $30' --empty-wardrobe`
+
+```text
+Since your wardrobe is currently empty, here are two ways to style this baby tee using common, versatile basics:
+
+1. **Casual Denim Look:** Pair the fitted baby tee with high-waisted, straight-leg or baggy light-wash jeans to balance the Y2K silhouette. Finish with white canvas sneakers and a simple shoulder bag.
+2. **Skater/Edgy Contrast:** Layer it with a pleated black tennis skirt or cargo trousers. Add chunky platform sneakers or combat boots to give the sweet butterfly graphic a cool, contrasting edge.
+```
+
+**Model unavailable** — a new, uncached query was run with a deliberately
+invalid process-local API credential; the real credential was neither printed
+nor changed on disk. The query was
+`saffron butterfly baby tee moonbeam under $19`.
+
+```text
+The styling model could not be reached, so I couldn't finish this request. Try again later, or check the configured model credentials.
+```
 
 
 ---
