@@ -245,6 +245,26 @@ Nothing beats the feel of truly broken-in denim, and these Vintage Levi's 501 Je
 
 ---
 
+## Stretch Features — Declared Before Build
+
+I am declaring these three stretch features before implementing them:
+
+1. **Second tool on MCP (+1):** Move `create_fit_card` behind the MCP
+   client/server boundary alongside `search_listings`, preserve its logical
+   string return value, and record a trace showing both MCP tool calls.
+2. **Retry with looser constraints (+1):** When an initial search with an
+   explicit size returns `[]`, retry exactly once without the size filter. The
+   trace will name the dropped size constraint, and a second empty result will
+   still stop before the model-backed tools.
+3. **Second measured improvement (+2):** Treat the size-filter retry as one
+   isolated second improvement, then run the same five scenarios five times
+   with caching off and add a third run log comparing it with the After run.
+
+The retry will be implemented and measured before the second MCP move so the
+third run can be attributed to one behavior change.
+
+---
+
 ## Run Log — Before
 
 <!-- Five criteria, five tries each, in this exact format.
