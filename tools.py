@@ -263,9 +263,10 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
         "Write a short social caption for this thrift find.\n\n"
         f"Selected listing:\n{_listing_details(new_item)}\n\n"
         f"Outfit suggestion:\n{outfit}\n\n"
-        "Write two to four sentences. Name the selected item, mention its "
-        "price and platform exactly once each, include at least one concrete "
-        "styling detail from the outfit suggestion, and describe a specific "
+        "Write two to four sentences. Use the selected listing title exactly "
+        "as shown, mention its price and platform exactly once each, include "
+        "at least two concrete styling details from the outfit suggestion, "
+        "and describe a specific "
         "vibe. Make it sound like something a person would post, not a product "
         "description. Return only the caption."
     )
