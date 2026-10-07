@@ -107,11 +107,12 @@ and continue through `suggest_outfit` and `create_fit_card`.
 
 **Where it lives:** `agent.py::run_agent`
 
-**MCP routing:** The search step calls
-`mcp_client.call_tool("search_listings", arguments)`. The registered tool in
-`mcp_server.py` delegates to the existing `tools.py::search_listings`
-implementation, and `mcp_client.py` unwraps the response back into the same
-`list[dict]` shape before it enters session state.
+**MCP routing:** The search and fit-card steps call
+`mcp_client.call_tool(...)`. The registered wrappers in `mcp_server.py`
+delegate to `tools.py::search_listings` and `tools.py::create_fit_card`, while
+`mcp_client.py` unwraps their responses back into the original `list[dict]`
+and `str` shapes before they enter session state. `suggest_outfit` remains a
+direct tool call.
 
 **How the query is parsed:** Deterministic string parsing in
 `agent.py::run_agent`: extract an `under $...` price and an explicit size when
@@ -529,11 +530,12 @@ behaved differently afterwards. If the rewire didn't work, say exactly where it
 broke — the error text and the last thing that worked. That earns the point in
 full. -->
 
-`agent.py::run_agent` calls `mcp_client.call_tool("search_listings", ...)`;
-`mcp_server.py` registers that one tool and delegates to
-`tools.py::search_listings`. The MCP client normalizes the response back to the
-same `list[dict]` used by session state, so the logical search result and later
-planning-loop behavior remained the same after the rewire.
+For the required Milestone 1 move, `agent.py::run_agent` called
+`mcp_client.call_tool("search_listings", ...)`; `mcp_server.py` delegated to
+`tools.py::search_listings`, and the client normalized the response back to the
+same `list[dict]`. The earlier trace above records that pre-bonus architecture.
+The separately declared second MCP tool is documented with its own post-build
+trace below.
 
 ### Failure-mode checks
 
@@ -908,6 +910,62 @@ were both 5 of 5 on all five rows. The new behavior is demonstrated directly:
 all five Criterion 2 tries logged the one size-free retry before stopping, and
 the separate valid-budget trace recovered seven listings and completed the
 remaining tools.
+
+---
+
+## Bonus — Second Tool on MCP
+
+**Tool moved:** `create_fit_card(outfit, new_item)` is now registered beside
+`search_listings` in `mcp_server.py`.
+
+**Code path:** `agent.py::run_agent` → `mcp_client.call_tool` →
+`mcp_server.py::create_fit_card` → `tools.py::create_fit_card`. The MCP client
+unwraps the result back to `str`, so the logical fit-card value stored in
+session did not change; only its call path changed. `suggest_outfit` remains a
+direct call.
+
+**Server tool listing:** `python mcp_client.py`
+
+```text
+Asking mcp_server.py what it offers…
+
+  search_listings
+    Return ranked listing dictionaries matching the description, optional size, and inclusive maximum price, or [] when nothing matches.
+    - description: string
+    - size: string  (optional)
+    - max_price: number  (optional)
+
+  create_fit_card
+    Return a short social caption based on an outfit suggestion and its selected listing.
+    - outfit: string
+    - new_item: object
+```
+
+**Direct MCP return-shape check:**
+
+```text
+RETURN_TYPE=str
+Nothing beats finding the exact Vintage Levi's 501 Jeans — Medium Wash I've been hunting for. Grabbed these on Depop for just $38.00 and they fit like an absolute dream. I'm wearing them with a simple white ribbed tank and chunky white sneakers for the ultimate effortless weekend vibe.
+```
+
+**Full agent run through both MCP paths:**
+`python app.py ask 'vintage graphic tee under $30' --trace`
+
+```text
+[1] search_listings (via MCP)
+      in:  description='vintage graphic tee', size=None, max_price=30.0
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+      →    branch: results found, continuing
+[2] suggest_outfit
+      in:  new_item='Y2K Baby Tee — Butterfly Print' (id=lst_002), wardrobe_items=10
+      out: **Outfit 1: Y2K Streetwear** *   **Top:** Y2K Baby Tee — Butterfly Print *   **Bottoms:** Baggy straight-leg j…
+[3] create_fit_card (via MCP)
+      in:  new_item='Y2K Baby Tee — Butterfly Print'; outfit='**Outfit 1: Y2K Streetwear**\n*   **Top:** Y2K Baby Tee — B…
+      out: Channeling ultimate early 2000s energy in this Y2K Baby Tee — Butterfly Print. I’m styling it with baggy strai…
+```
+
+This MCP move was made after the Bonus Retry evaluation, so it does not affect
+the attribution of the second measured improvement.
 
 
 <!-- ═════════════════════════════════════════════════════════════════════

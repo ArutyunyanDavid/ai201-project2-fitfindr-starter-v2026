@@ -6,9 +6,10 @@ them. MCP is an agreed shape you wrap a tool in so that anything speaking the
 same protocol can call it — your agent today, a different agent tomorrow,
 someone else's app after that.
 
-**You're moving one tool. Not three.** The point is to see the seam.
-`search_listings` is the one to move: it doesn't call the model, so nothing is
-slow and nothing changes between runs while you're learning the shape.
+The required milestone moves `search_listings`: it doesn't call the model, so
+nothing is slow and nothing changes between runs while you're learning the
+shape. The declared stretch feature later adds `create_fit_card` as the second
+MCP tool while leaving `suggest_outfit` as a direct call.
 
     python mcp_server.py        starts the server (it will just sit there — that's right)
     python mcp_client.py        asks the server what it offers
@@ -59,6 +60,7 @@ works with a direct call, and **a documented failure earns the point in full.**
 
 from mcp.server.fastmcp import FastMCP
 
+from tools import create_fit_card as _create_fit_card_impl
 from tools import search_listings as _search_listings_impl
 
 # log_level="WARNING" keeps the server from printing an INFO line for every
@@ -79,15 +81,20 @@ def search_listings(
     return _search_listings_impl(description, size, max_price)
 
 
+@mcp.tool()
+def create_fit_card(outfit: str, new_item: dict) -> str:
+    """Return a short social caption based on an outfit suggestion and its selected listing."""
+    return _create_fit_card_impl(outfit, new_item)
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 #
-# Two notes on the block above.
+# Two notes on the registrations above.
 #
-# The registered name is the *function* name — so the block above registers
-# "search_listings", which is exactly what call_tool("search_listings", ...)
-# asks for. That is also why the import at the top of this file brings the real
-# implementation in under an alias: without it, the registered function and the
-# one it calls would be the same name, and the tool would call itself.
+# Each registered name is the *function* name, which is exactly what
+# call_tool(...) asks for. That is also why the imports at the top bring the
+# real implementations in under aliases: without them, each registered wrapper
+# and the implementation it calls would share a name and recurse into itself.
 #
 # FastMCP builds the input schema from your type hints, which is why the hints
 # are not optional here. `description: str` becomes a required string;

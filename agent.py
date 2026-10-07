@@ -18,7 +18,7 @@ import re
 import config
 import mcp_client
 import trace
-from tools import suggest_outfit, create_fit_card
+from tools import suggest_outfit
 from generate import ModelUnavailable
 
 
@@ -215,25 +215,28 @@ def run_agent(query: str, wardrobe: dict) -> dict:
                 f"outfit={session['outfit_suggestion']!r}"
             )
             try:
-                session["fit_card"] = create_fit_card(
-                    session["outfit_suggestion"],
-                    session["selected_item"],
+                session["fit_card"] = mcp_client.call_tool(
+                    "create_fit_card",
+                    {
+                        "outfit": session["outfit_suggestion"],
+                        "new_item": session["selected_item"],
+                    },
                 )
-            except ModelUnavailable:
+            except (ModelUnavailable, mcp_client.MCPError):
                 session["error"] = (
-                    "The styling model could not be reached, so I couldn't "
+                    "The fit-card service could not be reached, so I couldn't "
                     "finish this request. Try again later, or check the "
-                    "configured model credentials."
+                    "configured MCP server and model credentials."
                 )
                 trace.step(
-                    "create_fit_card",
+                    "create_fit_card (via MCP)",
                     inputs=fit_card_inputs,
                     returned=session["error"],
-                    note="model unavailable, stopping",
+                    note="MCP or model unavailable, stopping",
                 )
                 return session
             trace.step(
-                "create_fit_card",
+                "create_fit_card (via MCP)",
                 inputs=fit_card_inputs,
                 returned=session["fit_card"],
             )
