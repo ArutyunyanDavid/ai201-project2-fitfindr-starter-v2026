@@ -223,6 +223,21 @@ Nothing beats the feel of truly broken-in denim, and these Vintage Levi's 501 Je
   search stores actionable advice and returns before either model-backed tool
   runs.
 
+### AI use example 3 — MCP, traces, and Before/After evaluation
+
+- **What I asked:** I asked Codex to preserve the existing project while
+  routing `search_listings` through MCP, triggering the three required failure
+  modes, reading the traces, and comparing one targeted improvement with the
+  same five evaluation scenarios.
+- **What the AI returned:** Codex helped verify the MCP response boundary,
+  identify a targeted model-unavailable handler, organize the trace and
+  criterion evidence, and strictly count the Before and After results against
+  the original targets.
+- **What I changed or decided:** I kept the original criteria and scenarios,
+  documented that every Before criterion was already MET, and made one
+  prompt-only change to test whether exact-title and styling-detail fidelity
+  improved without changing the scored targets.
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
@@ -361,33 +376,95 @@ Buy it. At $42, a cropped light-wash denim jacket with good structure is a versa
 
 ## Verdicts and Diagnoses
 
-<!-- MET or MISSED per criterion against LAST UNIT's target, plus a sentence on
-     how you decided.
+### Criterion 1 — A matching query completes all three tools
 
-     Then, for every miss: which of the four places it happened — a tool, the
-     loop's branch, the session, or the model's output — AND the mechanism.
+**Original criterion:** Given a query that matches at least one listing, the
+agent completes all three tool calls and returns a fit card — in at least 4 of
+5 tries.
 
-     Not a diagnosis:  "The fit card was bad."
-     A diagnosis:      "The fit card criterion missed on 2 of 5 items. Both had
-                        an empty brand field. My prompt puts the brand in the
-                        first sentence, so the card opened with a blank and read
-                        like a fragment. The tool worked; the prompt assumed a
-                        field that isn't always there."
+**Target:** At least 4 of 5
 
-     Look for a pattern. Three misses on the same tool is one problem, not
-     three. -->
+**Results:** PASS, PASS, PASS, PASS, PASS
 
-| # | Criterion | Target | Verdict | How I decided |
-|---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+**Verdict:** MET (5/5)
 
-**Diagnoses**
+**How decided:** All five traces contain `search_listings`, `suggest_outfit`,
+and `create_fit_card`, and every try returned a fit card, so 5 passes meets the
+target of at least 4.
 
+### Criterion 2 — An impossible query stops before the second tool
 
+**Original criterion:** Given a query that matches no listings, the agent stops
+before calling `suggest_outfit` and returns a message naming what to change — 5
+of 5 tries.
+
+**Target:** 5 of 5
+
+**Results:** PASS, PASS, PASS, PASS, PASS
+
+**Verdict:** MET (5/5)
+
+**How decided:** Each of the five tries stopped after the empty
+`search_listings` result, omitted `suggest_outfit`, and suggested changing the
+description, size, or maximum price, so all 5 required tries passed.
+
+### Criterion 3 — The selected item stays the same across session state
+
+**Original criterion:** Given a query that returns at least one listing, the
+item stored in `session["selected_item"]` is the same listing passed into
+`suggest_outfit` — in 5 of 5 tries.
+
+**Target:** 5 of 5
+
+**Results:** PASS, PASS, PASS, PASS, PASS
+
+**Verdict:** MET (5/5)
+
+**How decided:** In every try, session stored `90s Track Jacket — Navy/White
+Stripe` and the `suggest_outfit` trace received that same title and listing ID
+`lst_004`, so all 5 required tries passed.
+
+### Criterion 4 — The fit card includes useful information about the selected item
+
+**Original criterion:** Given a successful search and outfit suggestion, the
+final fit card names the selected item and includes at least one styling detail
+from the outfit suggestion — in at least 4 of 5 tries.
+
+**Target:** At least 4 of 5
+
+**Results:** PASS, PASS, PASS, PASS, PASS
+
+**Verdict:** MET (5/5)
+
+**How decided:** All five fit cards named the light-wash cropped denim jacket
+and reused at least one concrete outfit detail, including jeans, a white tank,
+a hoodie, sneakers, a sweatshirt, or khaki trousers, so 5 passes exceeds the
+target of at least 4.
+
+### Criterion 5 — An empty wardrobe does not cause the agent to fail
+
+**Original criterion:** Given an empty wardrobe, `suggest_outfit` returns at
+least one general styling recommendation and does not raise an error — in 5 of
+5 tries.
+
+**Target:** 5 of 5
+
+**Results:** PASS, PASS, PASS, PASS, PASS
+
+**Verdict:** MET (5/5)
+
+**How decided:** Every trace passed `wardrobe_items=0` to `suggest_outfit`, and
+all five responses returned multiple general styling recommendations without
+an error, so all 5 required tries passed.
+
+### Patterns Across Misses
+
+There were no misses, so there is no shared failure pattern and no
+Step/Mechanism diagnosis to report. No criterion was revised. In a future
+evaluation, Criterion 4 could reasonably be made stricter because it passed 5
+of 5: it could require every fit card to preserve the exact listing title and
+two concrete styling details, rather than one, while leaving this original
+criterion and result unchanged.
 
 ---
 
@@ -473,29 +550,154 @@ The styling model could not be reached, so I couldn't finish this request. Try a
 
 ## The Improvement
 
-<!-- What you changed, why your diagnosis pointed at it, and the after-run in
-     the same table format. One change, measured properly.
+**What I changed:** I changed one instruction in
+`tools.py::create_fit_card`. The prompt now asks the model to use the selected
+listing title exactly as shown and include at least two concrete details from
+the outfit suggestion. Previously, it asked the model to name the item and
+include at least one outfit detail.
 
-     `python run_eval.py --label after` -->
+**Why I picked it:** Milestone 4 found no missed criterion and therefore no
+failure diagnosis to fix. Its only documented improvement opportunity was a
+stricter future version of Criterion 4: the Before cards passed the original
+criterion, but they could paraphrase the listing title and satisfy it with only
+one styling detail. This experiment proactively hardens that model-output step
+without inventing a missed result.
 
-**What I changed:**
+**Expected effect:** Criterion 4 only. The intended effect was stronger title
+and styling-detail fidelity; the original criterion, target, scenarios, loop,
+session handling, tool return shapes, model settings, and cache-off evaluation
+mode remained unchanged.
 
-**Which failure it was meant to fix:**
+**Relevant file and function:** `tools.py::create_fit_card`
+
+**MCP note:** `search_listings` still runs through
+`agent.py` → `mcp_client.py` → `mcp_server.py` →
+`tools.py::search_listings` rather than being called directly by the loop. Its
+logical `list[dict]` result did not change after the MCP move; only the call
+path changed.
 
 ### Run Log — After
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes all three tools | At least 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Selected item stays the same across session state | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card includes the selected item and a styling detail | At least 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Empty wardrobe returns general styling advice without an error | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Did it help, and how do I know:**
+The complete unedited output for all 25 After tries is in
+`results/run_2026-10-06_1214_after.md`. The evidence below is copied from Try
+1 of each scenario.
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
+#### Criterion 1 evidence — After
+
+Source: `agent.py` — `run_agent()`; captured by `run_eval.py` — `run_once()`
+
+```text
+- stopped early: no
+- selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+- search_results: 10
+
+Fit card:
+
+Channeling total 2000s streetwear energy with this Y2K Baby Tee — Butterfly Print. I love balancing the fitted crop with baggy straight-leg jeans and chunky white sneakers. Grab this vintage gem on Depop for just $18.00 before it’s gone!
+
+Trace:
+
+[1] search_listings (via MCP)
+      in:  description='vintage graphic tee', size=None, max_price=30.0
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+      →    branch: results found, continuing
+[2] suggest_outfit
+      in:  new_item='Y2K Baby Tee — Butterfly Print' (id=lst_002), wardrobe_items=10
+      out: **Outfit 1: Y2K Streetwear** *   **Top:** Y2K baby tee *   **Bottoms:** Baggy straight-leg jeans (dark blue) *…
+[3] create_fit_card
+      in:  new_item='Y2K Baby Tee — Butterfly Print'; outfit='**Outfit 1: Y2K Streetwear**\n*   **Top:** Y2K baby tee\n* …
+      out: Channeling total 2000s streetwear energy with this Y2K Baby Tee — Butterfly Print. I love balancing the fitted…
+```
+
+#### Criterion 2 evidence — After
+
+Source: `agent.py` — `run_agent()`; captured by `run_eval.py` — `run_once()`
+
+```text
+- stopped early: yes — No listings matched. Try using different description words or changing or removing the size or raising the maximum price.
+- selected_item: (none)
+- search_results: 0
+
+Trace:
+
+[1] search_listings (via MCP)
+      in:  description='designer ballgown', size='XXS', max_price=5.0
+      out: [] (empty)
+      →    branch: empty, stopping
+```
+
+#### Criterion 3 evidence — After
+
+Source: `agent.py` — `run_agent()`; captured by `run_eval.py` — `run_once()`
+
+```text
+- stopped early: no
+- selected_item: 90s Track Jacket — Navy/White Stripe ($45.0, poshmark)
+- search_results: 7
+
+[2] suggest_outfit
+      in:  new_item='90s Track Jacket — Navy/White Stripe' (id=lst_004), wardrobe_items=10
+      out: **Outfit 1: Casual Streetwear** *   **Top:** White ribbed tank top *   **Bottoms:** Baggy straight-leg jeans (…
+```
+
+#### Criterion 4 evidence — After
+
+Source: `tools.py` — `create_fit_card()` via `agent.py` — `run_agent()`;
+captured by `run_eval.py` — `run_once()`
+
+```text
+- selected_item: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
+
+Outfit suggestion:
+
+**Outfit 1: High-Contrast Denim (Double Denim)**
+*   **Top:** White ribbed tank top
+*   **Bottoms:** Baggy straight-leg jeans (dark wash)
+*   **Outerwear:** Denim jacket (light wash)
+*   **Shoes:** Chunky white sneakers
+*   **Accessories:** Black crossbody bag
+
+Fit card:
+
+Double denim is having a serious moment, and this thrifted Denim Jacket — Light Wash, Cropped is the ultimate blank canvas for it. I love styling it with baggy dark wash jeans and chunky white sneakers for that effortless streetwear edge. Grab it on Poshmark for just $42.00 before I change my mind!
+```
+
+#### Criterion 5 evidence — After
+
+Source: `tools.py` — `suggest_outfit()` via `agent.py` — `run_agent()`;
+captured by `run_eval.py` — `run_once()`
+
+```text
+- stopped early: no
+- selected_item: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
+- search_results: 7
+
+Outfit suggestion:
+
+**Verdict: Buy.** At $42, a cropped light-wash denim jacket is a versatile year-round staple.
+
+**How to style it using common basics:**
+1. **High-Rise Casual:** Pair it with a white cotton t-shirt, high-waisted black straight-leg trousers, and white leather sneakers. The high rise balances the cropped hem of the jacket.
+2. **Contrast Textures:** Layer it over a black ribbed midi dress with canvas slip-on sneakers for an easy, balanced look between fitted and structured.
+
+[2] suggest_outfit
+      in:  new_item='Denim Jacket — Light Wash, Cropped' (id=lst_007), wardrobe_items=0
+      out: **Verdict: Buy.** At $42, a cropped light-wash denim jacket is a versatile year-round staple.  **How to style …
+```
+
+**Did it help, and how do I know:** The change made no measurable difference
+to the original acceptance criteria: Before and After were both 5 of 5 on all
+five criteria. The stronger, unscored prompt goal did appear in all five
+Criterion 4 After cards—they used the exact listing title and at least two
+outfit details—but that does not change the original criterion's score.
 
 
 
@@ -503,10 +705,20 @@ The styling model could not be reached, so I couldn't finish this request. Try a
 
 ## What's Still Broken
 
-<!-- For each criterion still missed: what you'd do, and why you stopped where
-     you did. "I ran out of time" is fine if it's true. Pretending nothing is
-     left is not. -->
+No tested criterion remains MISSED after the improvement: Criteria 1–5 are all
+MET at 5 of 5 against their original targets, so there is no remaining miss to
+diagnose or list as broken.
 
+A known limitation remains outside those passing scores: the outfit and
+fit-card steps depend on an external model, so a service or credential failure
+can prevent a completed recommendation even though the agent now stops with an
+actionable message. The evaluation also covers the five fixed scenarios rather
+than every listing category or phrasing. A future test could apply the stricter
+exact-title/two-detail check across several different selected items.
+
+I stopped after this one measured prompt change because Milestone 5 requires a
+single intervention; another behavior change would make the Before/After
+effect impossible to attribute to one cause.
 
 
 <!-- ═════════════════════════════════════════════════════════════════════
