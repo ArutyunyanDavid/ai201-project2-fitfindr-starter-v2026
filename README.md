@@ -740,6 +740,175 @@ I stopped after this one measured prompt change because Milestone 5 requires a
 single intervention; another behavior change would make the Before/After
 effect impossible to attribute to one cause.
 
+---
+
+## Bonus — Second Measured Improvement
+
+**Diagnosis:** The earlier empty-search loop stopped immediately when an
+explicit size filter produced no matches. The failure place was the loop
+branch, and the mechanism was that it treated the first `[]` as final without
+checking whether size alone was the restrictive constraint.
+
+**One change:** In `agent.py::run_agent`, a sized search that returns `[]` now
+retries exactly once with `size=None`. Session state records the original size
+in `dropped_constraints`, the trace names that dropped value, and a second
+empty result still stops before `suggest_outfit`.
+
+**Isolation:** The same five scenarios, criteria, targets, model settings, and
+cache-off evaluator were used. This run occurred before moving the second tool
+onto MCP, so the comparison measures only the retry change.
+
+### Run Log — Bonus Retry
+
+| Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
+|---|---|---|---|---|---|---|---|
+| 1. Matching query completes all three tools | At least 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Selected item stays the same across session state | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card includes the selected item and a styling detail | At least 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Empty wardrobe returns general styling advice without an error | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+
+The complete unedited output for all 25 Bonus Retry tries is in
+`results/run_2026-10-06_2344_bonus_retry.md`. The evidence below is copied
+from Try 1 of each scenario.
+
+#### Criterion 1 evidence — Bonus Retry
+
+Source: `agent.py` — `run_agent()`; captured by `run_eval.py` — `run_once()`
+
+```text
+- stopped early: no
+- selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+- search_results: 10
+
+Fit card:
+
+Channeling major early 2000s energy in this Y2K Baby Tee — Butterfly Print paired with baggy straight-leg jeans and chunky white sneakers. Score this vintage piece for just $18.00 on Depop before it’s gone!
+
+Trace:
+
+[1] search_listings (via MCP)
+      in:  description='vintage graphic tee', size=None, max_price=30.0
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+      →    branch: results found, continuing
+[2] suggest_outfit
+      in:  new_item='Y2K Baby Tee — Butterfly Print' (id=lst_002), wardrobe_items=10
+      out: **Outfit 1: Y2K Streetwear Contrast** * **Top:** Y2K Baby Tee — Butterfly Print * **Bottoms:** Baggy straight-…
+[3] create_fit_card
+      in:  new_item='Y2K Baby Tee — Butterfly Print'; outfit='**Outfit 1: Y2K Streetwear Contrast**\n* **Top:** Y2K Baby …
+      out: Channeling major early 2000s energy in this Y2K Baby Tee — Butterfly Print paired with baggy straight-leg jean…
+```
+
+#### Criterion 2 evidence — Bonus Retry
+
+Source: `agent.py` — `run_agent()`; captured by `run_eval.py` — `run_once()`
+
+```text
+- stopped early: yes — No listings matched even after retrying without the size filter 'XXS'. Try using different description words or raising the maximum price.
+- selected_item: (none)
+- search_results: 0
+
+Trace:
+
+[1] search_listings (via MCP)
+      in:  description='designer ballgown', size='XXS', max_price=5.0
+      out: [] (empty)
+      →    branch: empty, retrying once without the size filter (dropped size='XXS')
+[2] search_listings (via MCP)
+      in:  description='designer ballgown', size=None, max_price=5.0
+      out: [] (empty)
+      →    branch: empty, stopping
+```
+
+#### Criterion 3 evidence — Bonus Retry
+
+Source: `agent.py` — `run_agent()`; captured by `run_eval.py` — `run_once()`
+
+```text
+- stopped early: no
+- selected_item: 90s Track Jacket — Navy/White Stripe ($45.0, poshmark)
+- search_results: 7
+
+[2] suggest_outfit
+      in:  new_item='90s Track Jacket — Navy/White Stripe' (id=lst_004), wardrobe_items=10
+      out: **Outfit 1: Casual Streetwear** *   **Top:** White ribbed tank top *   **Outerwear:** 90s Track Jacket (Navy/W…
+```
+
+#### Criterion 4 evidence — Bonus Retry
+
+Source: `tools.py` — `create_fit_card()` via `agent.py` — `run_agent()`;
+captured by `run_eval.py` — `run_once()`
+
+```text
+- selected_item: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
+
+Outfit suggestion:
+
+**Outfit 1: High-Contrast Denim (Double Denim)**
+*   **Top:** White ribbed tank top
+*   **Bottoms:** Baggy straight-leg jeans (dark wash)
+*   **Outerwear:** Denim jacket (light wash)
+*   **Shoes:** Chunky white sneakers
+*   **Accessories:** Black crossbody bag
+
+Fit card:
+
+Canadian tuxedo, but make it high-contrast. I threw this Denim Jacket — Light Wash, Cropped over a fitted white tank and dark baggy jeans for the ultimate casual streetwear vibe. Snagged it for $42.00 on Poshmark and honestly, it’s the best blank canvas.
+```
+
+#### Criterion 5 evidence — Bonus Retry
+
+Source: `tools.py` — `suggest_outfit()` via `agent.py` — `run_agent()`;
+captured by `run_eval.py` — `run_once()`
+
+```text
+- stopped early: no
+- selected_item: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
+- search_results: 7
+
+Outfit suggestion:
+
+Buy it. At $42 with structured shoulders, this light wash cropped denim jacket is a versatile layering staple.
+
+Here are two ways to style it using common basics:
+
+1. **Casual Contrast:** Pair it over a fitted black ribbed tank top with high-waisted wide-leg black trousers and white leather sneakers. The structured shoulders will elevate a simple monochrome base.
+2. **Double Denim / Textures:** Wear it over a simple white crewneck t-shirt tucked into olive green cargo pants or pleated beige chinos, finished with canvas slip-on shoes.
+
+[2] suggest_outfit
+      in:  new_item='Denim Jacket — Light Wash, Cropped' (id=lst_007), wardrobe_items=0
+      out: Buy it. At $42 with structured shoulders, this light wash cropped denim jacket is a versatile layering staple.…
+```
+
+### Successful looser-constraint retry
+
+Command:
+`python app.py ask 'denim jacket size XXS under $50' --trace`
+
+```text
+[1] search_listings (via MCP)
+      in:  description='denim jacket', size='XXS', max_price=50.0
+      out: [] (empty)
+      →    branch: empty, retrying once without the size filter (dropped size='XXS')
+[2] search_listings (via MCP)
+      in:  description='denim jacket', size=None, max_price=50.0
+      out: 7 items: Denim Jacket — Light Wash, Cropped, Vintage Levi's 501 Jeans — Medium Wash, 90s Track Jacket — Navy/White Stripe … +4 more
+      →    branch: results found, continuing
+[3] suggest_outfit
+      in:  new_item='Denim Jacket — Light Wash, Cropped' (id=lst_007), wardrobe_items=10
+      out: **Verdict:** Buy. It pairs seamlessly with your existing basics and provides a lighter outerwear option than y…
+[4] create_fit_card
+      in:  new_item='Denim Jacket — Light Wash, Cropped'; outfit='**Verdict:** Buy. It pairs seamlessly with your existin…
+      out: Found the ultimate layering piece with this Denim Jacket — Light Wash, Cropped for just $42 on Poshmark. I lov…
+```
+
+**Did the second improvement help:** It improved the sized-search behavior but
+made no numerical difference to the original criteria: After and Bonus Retry
+were both 5 of 5 on all five rows. The new behavior is demonstrated directly:
+all five Criterion 2 tries logged the one size-free retry before stopping, and
+the separate valid-budget trace recovered seven listings and completed the
+remaining tools.
+
 
 <!-- ═════════════════════════════════════════════════════════════════════
 

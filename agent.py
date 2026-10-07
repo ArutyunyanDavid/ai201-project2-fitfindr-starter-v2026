@@ -42,6 +42,8 @@ def new_session(query: str, wardrobe: dict) -> dict:
         "query": query,              # what the user typed
         "parsed": {},                # description / size / max_price you pulled out of it
         "search_results": [],        # everything search_listings returned
+        "search_attempts": 0,        # includes one optional retry without size
+        "dropped_constraints": {},  # original values removed for a retry
         "selected_item": None,       # the one you chose — goes into suggest_outfit
         "wardrobe": wardrobe,        # the user's wardrobe
         "outfit_suggestion": None,   # what suggest_outfit returned
@@ -107,14 +109,24 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         trace.check_iterations(iteration)
 
         if next_step == "search_listings":
+            session["search_attempts"] += 1
             search_inputs = {
                 "description": session["parsed"]["description"],
-                "size": session["parsed"]["size"],
+                "size": (
+                    None
+                    if "size" in session["dropped_constraints"]
+                    else session["parsed"]["size"]
+                ),
                 "max_price": session["parsed"]["max_price"],
             }
             session["search_results"] = mcp_client.call_tool(
                 "search_listings",
                 search_inputs,
+            )
+            can_retry_without_size = (
+                not session["search_results"]
+                and session["parsed"]["size"] is not None
+                and "size" not in session["dropped_constraints"]
             )
             trace.step(
                 "search_listings (via MCP)",
@@ -127,18 +139,39 @@ def run_agent(query: str, wardrobe: dict) -> dict:
                 note=(
                     "branch: results found, continuing"
                     if session["search_results"]
-                    else "branch: empty, stopping"
+                    else (
+                        "branch: empty, retrying once without the size filter "
+                        f"(dropped size={session['parsed']['size']!r})"
+                        if can_retry_without_size
+                        else "branch: empty, stopping"
+                    )
                 ),
             )
 
             if not session["search_results"]:
+                if can_retry_without_size:
+                    session["dropped_constraints"]["size"] = session["parsed"]["size"]
+                    next_step = "search_listings"
+                    continue
+
                 changes = ["using different description words"]
-                if session["parsed"]["size"] is not None:
+                if (
+                    session["parsed"]["size"] is not None
+                    and "size" not in session["dropped_constraints"]
+                ):
                     changes.append("changing or removing the size")
                 if session["parsed"]["max_price"] is not None:
                     changes.append("raising the maximum price")
+                retry_context = ""
+                if "size" in session["dropped_constraints"]:
+                    retry_context = (
+                        " even after retrying without the size filter "
+                        f"{session['dropped_constraints']['size']!r}"
+                    )
                 session["error"] = (
-                    "No listings matched. Try " + " or ".join(changes) + "."
+                    f"No listings matched{retry_context}. Try "
+                    + " or ".join(changes)
+                    + "."
                 )
                 return session
 
